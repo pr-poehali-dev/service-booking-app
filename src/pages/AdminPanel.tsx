@@ -31,6 +31,7 @@ interface Booking {
   userName: string;
   phone: string;
   car: string;
+  service?: string;
   dateTime: string;
   comment: string;
   createdAt: string;
@@ -167,6 +168,12 @@ const AdminPanel = () => {
                         {formatDateTime(booking.dateTime)}
                       </Badge>
                     </div>
+                    {booking.service && (
+                      <p className="text-xs text-primary font-medium mb-1">
+                        <Icon name="Wrench" size={12} className="inline mr-1" />
+                        {booking.service}
+                      </p>
+                    )}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Icon name="Car" size={12} />
@@ -273,6 +280,13 @@ const AdminPanel = () => {
                   <span className="text-muted-foreground">Телефон:</span>
                   <span className="font-medium">{selectedBooking.phone}</span>
                 </div>
+                {selectedBooking.service && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Icon name="Wrench" size={14} className="text-muted-foreground" />
+                    <span className="text-muted-foreground">Услуга:</span>
+                    <span className="font-medium">{selectedBooking.service}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-sm">
                   <Icon name="Car" size={14} className="text-muted-foreground" />
                   <span className="text-muted-foreground">Автомобиль:</span>

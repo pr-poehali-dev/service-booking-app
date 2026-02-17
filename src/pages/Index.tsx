@@ -74,9 +74,22 @@ const Index = () => {
   const [bookingName, setBookingName] = useState("Василий Геннадьевич");
   const [bookingPhone, setBookingPhone] = useState("+7 (900) 660-37-37");
   const [bookingComment, setBookingComment] = useState("");
+  const [bookingService, setBookingService] = useState("oil-change");
   const [bookingSent, setBookingSent] = useState(false);
 
   const selectedCar = cars.find((c) => c.id === selectedCarId) || cars[0];
+
+  const serviceTypes = [
+    { id: "oil-change", label: "Заявка на замену масла" },
+    { id: "fluid-change", label: "Аппаратная замена технических жидкостей" },
+    { id: "power-steering", label: "Замена масла в гидроусилителе руля" },
+    { id: "axle-oil", label: "Замена масла в мостах (РЕДУКТОР)" },
+    { id: "coolant", label: "Замена охлаждающей жидкости (АНТИФРИЗ)" },
+    { id: "filters", label: "Замена фильтров" },
+    { id: "transmission", label: "Замена масла в АКПП, ВАРИАТОР" },
+  ];
+
+  const selectedServiceLabel = serviceTypes.find((s) => s.id === bookingService)?.label || "";
 
   const userData = {
     name: "Василий Геннадьевич",
@@ -125,6 +138,7 @@ const Index = () => {
       userName: bookingName,
       phone: bookingPhone,
       car: selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : "",
+      service: selectedServiceLabel,
       dateTime: bookingDate,
       comment: bookingComment,
       createdAt: new Date().toISOString(),
@@ -137,14 +151,14 @@ const Index = () => {
     const existingUser = users.find((u: { phone: string; cars: string[]; history: { date: string; action: string }[] }) => u.phone === bookingPhone);
     if (existingUser) {
       existingUser.cars = [...new Set([...existingUser.cars, selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : ""])];
-      existingUser.history.push({ date: new Date().toISOString(), action: `Запись: ${bookingComment || "Замена масла"}` });
+      existingUser.history.push({ date: new Date().toISOString(), action: `${selectedServiceLabel}${bookingComment ? ` — ${bookingComment}` : ""}` });
     } else {
       users.push({
         id: Date.now().toString(),
         name: bookingName,
         phone: bookingPhone,
         cars: [selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : ""],
-        history: [{ date: new Date().toISOString(), action: `Запись: ${bookingComment || "Замена масла"}` }],
+        history: [{ date: new Date().toISOString(), action: `${selectedServiceLabel}${bookingComment ? ` — ${bookingComment}` : ""}` }],
         createdAt: new Date().toISOString(),
       });
     }
@@ -393,7 +407,7 @@ const Index = () => {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold">Запись на обслуживание</h2>
-                    <p className="text-sm text-muted-foreground">Заявка на замену масла</p>
+                    <p className="text-sm text-muted-foreground">Выберите услугу и запишитесь</p>
                   </div>
                 </div>
 
@@ -419,6 +433,25 @@ const Index = () => {
                       Телефон
                     </label>
                     <Input type="tel" value={bookingPhone} onChange={(e) => setBookingPhone(e.target.value)} className="bg-muted/30 border-border/50 focus:border-primary" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Icon name="Wrench" size={16} />
+                      Вид услуги
+                    </label>
+                    <Select value={bookingService} onValueChange={setBookingService}>
+                      <SelectTrigger className="bg-muted/30 border-border/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {serviceTypes.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {service.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
