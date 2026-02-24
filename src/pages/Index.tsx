@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import Icon from "@/components/ui/icon";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -21,547 +18,534 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import func2url from "../../backend/func2url.json";
 
 interface Car {
-  id: string;
+  id: string | number;
   brand: string;
   model: string;
   year: string;
-  lastOilChange: string;
-  nextOilChange: string;
+  last_oil_change: string;
+  next_oil_change: string;
 }
 
-const STORAGE_KEY = "autoservice_cars";
-const SELECTED_CAR_KEY = "autoservice_selected_car";
-const BOOKINGS_KEY = "autoservice_bookings";
-const USERS_KEY = "autoservice_users";
+interface Booking {
+  id: number;
+  car_label: string;
+  service: string;
+  scheduled_at: string | null;
+  comment: string;
+  status: string;
+  created_at: string;
+}
 
-const loadCars = (): Car[] => {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) return JSON.parse(saved);
-  const defaultCar: Car = {
-    id: "1",
-    brand: "Toyota",
-    model: "Land Cruiser",
-    year: "2023",
-    lastOilChange: "21.12.2025",
-    nextOilChange: "21.06.2026",
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([defaultCar]));
-  return [defaultCar];
+const SERVICE_TYPES = [
+  { id: "oil-change", label: "Замена масла" },
+  { id: "fluid-change", label: "Аппаратная замена технических жидкостей" },
+  { id: "power-steering", label: "Замена масла в гидроусилителе руля" },
+  { id: "axle-oil", label: "Замена масла в мостах (РЕДУКТОР)" },
+  { id: "coolant", label: "Замена охлаждающей жидкости (АНТИФРИЗ)" },
+  { id: "filters", label: "Замена фильтров" },
+  { id: "transmission", label: "Замена масла в АКПП, ВАРИАТОР" },
+];
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  new: { label: "Новая", color: "bg-primary/20 text-primary border-primary/30" },
+  in_progress: { label: "В работе", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  done: { label: "Выполнена", color: "bg-green-500/20 text-green-400 border-green-500/30" },
 };
 
-const saveCars = (cars: Car[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cars));
+const formatDT = (s: string | null) => {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
-const getMinDateTime = () => {
+const getMinDT = () => {
   const now = new Date();
-  const offset = now.getTimezoneOffset();
-  const local = new Date(now.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 16);
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
+
+type Tab = "home" | "booking" | "history" | "contacts";
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState("home");
-  const [cars, setCars] = useState<Car[]>(loadCars);
-  const [selectedCarId, setSelectedCarId] = useState<string>(() => {
-    return localStorage.getItem(SELECTED_CAR_KEY) || loadCars()[0]?.id || "";
-  });
+  const navigate = useNavigate();
+  const userId = localStorage.getItem("user_id");
+  const userPhone = localStorage.getItem("user_phone") || "";
+  const [userName, setUserName] = useState(localStorage.getItem("user_name") || "");
+
+  const [tab, setTab] = useState<Tab>("home");
+  const [cars, setCars] = useState<Car[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [selectedCarId, setSelectedCarId] = useState<string>("");
   const [carDialogOpen, setCarDialogOpen] = useState(false);
-  const [newCar, setNewCar] = useState({ brand: "", model: "", year: "", lastOilChange: "", nextOilChange: "" });
+  const [newCar, setNewCar] = useState({ brand: "", model: "", year: "", last_oil_change: "", next_oil_change: "" });
   const [bookingDate, setBookingDate] = useState("");
-  const [bookingName, setBookingName] = useState("Василий Геннадьевич");
-  const [bookingPhone, setBookingPhone] = useState("+7 (900) 660-37-37");
-  const [bookingComment, setBookingComment] = useState("");
   const [bookingService, setBookingService] = useState("oil-change");
+  const [bookingComment, setBookingComment] = useState("");
   const [bookingSent, setBookingSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
-  const selectedCar = cars.find((c) => c.id === selectedCarId) || cars[0];
+  useEffect(() => {
+    if (!userId) {
+      navigate("/login");
+      return;
+    }
+    loadProfile();
+  }, [userId]);
 
-  const serviceTypes = [
-    { id: "oil-change", label: "Заявка на замену масла" },
-    { id: "fluid-change", label: "Аппаратная замена технических жидкостей" },
-    { id: "power-steering", label: "Замена масла в гидроусилителе руля" },
-    { id: "axle-oil", label: "Замена масла в мостах (РЕДУКТОР)" },
-    { id: "coolant", label: "Замена охлаждающей жидкости (АНТИФРИЗ)" },
-    { id: "filters", label: "Замена фильтров" },
-    { id: "transmission", label: "Замена масла в АКПП, ВАРИАТОР" },
-  ];
-
-  const selectedServiceLabel = serviceTypes.find((s) => s.id === bookingService)?.label || "";
-
-  const userData = {
-    name: "Василий Геннадьевич",
-    phone: "+7 (900) 660-37-37",
-    address: "Анивская улица, 145, Южно-Сахалинск",
-    gisLink: "https://2gis.ru",
+  const loadProfile = async () => {
+    setProfileLoading(true);
+    try {
+      const res = await fetch(`${func2url.profile}?user_id=${userId}`);
+      const data = await res.json();
+      if (data.user) {
+        const name = data.user.name || "";
+        setUserName(name);
+        localStorage.setItem("user_name", name);
+      }
+      setCars(data.cars || []);
+      setBookings(data.bookings || []);
+      if (data.cars?.length > 0) setSelectedCarId(String(data.cars[0].id));
+    } catch {
+      // offline fallback
+    } finally {
+      setProfileLoading(false);
+    }
   };
 
-  useEffect(() => {
-    saveCars(cars);
-  }, [cars]);
+  const selectedCar = cars.find((c) => String(c.id) === selectedCarId) || cars[0];
+  const selectedServiceLabel = SERVICE_TYPES.find((s) => s.id === bookingService)?.label || "";
 
-  useEffect(() => {
-    localStorage.setItem(SELECTED_CAR_KEY, selectedCarId);
-  }, [selectedCarId]);
-
-  const addCar = () => {
+  const addCar = async () => {
     if (!newCar.brand || !newCar.model) return;
-    const car: Car = {
-      id: Date.now().toString(),
-      brand: newCar.brand,
-      model: newCar.model,
-      year: newCar.year || new Date().getFullYear().toString(),
-      lastOilChange: newCar.lastOilChange || "—",
-      nextOilChange: newCar.nextOilChange || "—",
-    };
-    const updated = [...cars, car];
-    setCars(updated);
-    setSelectedCarId(car.id);
-    setNewCar({ brand: "", model: "", year: "", lastOilChange: "", nextOilChange: "" });
-    setCarDialogOpen(false);
-  };
-
-  const deleteCar = (id: string) => {
-    const updated = cars.filter((c) => c.id !== id);
-    setCars(updated);
-    if (selectedCarId === id && updated.length > 0) {
-      setSelectedCarId(updated[0].id);
-    }
-  };
-
-  const handleBooking = () => {
-    if (!bookingDate || !bookingName || !bookingPhone) return;
-    const booking = {
-      id: Date.now().toString(),
-      userName: bookingName,
-      phone: bookingPhone,
-      car: selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : "",
-      service: selectedServiceLabel,
-      dateTime: bookingDate,
-      comment: bookingComment,
-      createdAt: new Date().toISOString(),
-    };
-    const existing = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || "[]");
-    existing.push(booking);
-    localStorage.setItem(BOOKINGS_KEY, JSON.stringify(existing));
-
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-    const existingUser = users.find((u: { phone: string; cars: string[]; history: { date: string; action: string }[] }) => u.phone === bookingPhone);
-    if (existingUser) {
-      existingUser.cars = [...new Set([...existingUser.cars, selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : ""])];
-      existingUser.history.push({ date: new Date().toISOString(), action: `${selectedServiceLabel}${bookingComment ? ` — ${bookingComment}` : ""}` });
-    } else {
-      users.push({
-        id: Date.now().toString(),
-        name: bookingName,
-        phone: bookingPhone,
-        cars: [selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : ""],
-        history: [{ date: new Date().toISOString(), action: `${selectedServiceLabel}${bookingComment ? ` — ${bookingComment}` : ""}` }],
-        createdAt: new Date().toISOString(),
+    try {
+      const res = await fetch(`${func2url.profile}/cars`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: Number(userId), ...newCar }),
       });
+      const data = await res.json();
+      if (data.ok) {
+        const car: Car = { id: data.car_id, ...newCar };
+        setCars((prev) => [...prev, car]);
+        setSelectedCarId(String(data.car_id));
+        setNewCar({ brand: "", model: "", year: "", last_oil_change: "", next_oil_change: "" });
+        setCarDialogOpen(false);
+      }
+    } catch {
+      // ignore
     }
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  };
 
-    setBookingSent(true);
-    setBookingComment("");
-    setBookingDate("");
-    setTimeout(() => setBookingSent(false), 3000);
+  const handleBooking = async () => {
+    if (!bookingDate) return;
+    setLoading(true);
+    try {
+      const res = await fetch(func2url.bookings, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: Number(userId),
+          phone: userPhone,
+          user_name: userName,
+          car_label: selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : "",
+          service: selectedServiceLabel,
+          scheduled_at: new Date(bookingDate).toISOString(),
+          comment: bookingComment,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBookingSent(true);
+        setBookingComment("");
+        setBookingDate("");
+        await loadProfile();
+        setTimeout(() => setBookingSent(false), 4000);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("user_phone");
+    localStorage.removeItem("user_name");
+    navigate("/login");
+  };
+
+  const CONTACTS = {
+    address: "Анивская улица, 145, Южно-Сахалинск",
+    phone: "+7 (900) 660-37-37",
+    gis: "https://2gis.ru",
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-md mx-auto pb-24">
-        <div className="relative pt-8 px-4 pb-6">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-accent opacity-20 blur-3xl" />
-          <div className="relative flex items-center gap-4 animate-fade-in">
-            <Avatar className="h-16 w-16 ring-4 ring-primary/20">
-              <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white text-xl font-bold">
-                {userData.name.split(" ").map((n) => n[0]).join("")}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{userData.name}</h1>
-              <p className="text-muted-foreground text-sm">Добро пожаловать!</p>
-            </div>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+            <Icon name="Wrench" size={16} className="text-black" />
+          </div>
+          <div>
+            <p className="font-bold text-sm leading-none">АвтоСервис</p>
+            <p className="text-xs text-muted-foreground leading-none mt-0.5">{userPhone}</p>
           </div>
         </div>
+        <button onClick={logout} className="text-muted-foreground hover:text-foreground transition-colors">
+          <Icon name="LogOut" size={18} />
+        </button>
+      </div>
 
-        <div className="px-4 space-y-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-card/50 backdrop-blur-sm border border-border/50">
-              <TabsTrigger value="home" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-primary data-[state=active]:to-secondary">
-                <Icon name="Home" size={18} />
-              </TabsTrigger>
-              <TabsTrigger value="service" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-primary data-[state=active]:to-secondary">
-                <Icon name="Wrench" size={18} />
-              </TabsTrigger>
-              <TabsTrigger value="booking" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-primary data-[state=active]:to-secondary">
-                <Icon name="Calendar" size={18} />
-              </TabsTrigger>
-              <TabsTrigger value="contacts" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-primary data-[state=active]:to-secondary">
-                <Icon name="Phone" size={18} />
-              </TabsTrigger>
-            </TabsList>
+      <div className="max-w-md mx-auto px-4 pb-28">
+        {/* TAB: home */}
+        {tab === "home" && (
+          <div className="pt-5 space-y-5 animate-fade-in">
+            <div>
+              <h2 className="text-xl font-bold">
+                {userName ? `Привет, ${userName.split(" ")[0]}` : "Личный кабинет"}
+              </h2>
+              <p className="text-muted-foreground text-sm">Ваши автомобили</p>
+            </div>
 
-            <TabsContent value="home" className="space-y-4 animate-fade-in">
-              <Card className="p-6 bg-gradient-to-br from-card via-card to-primary/5 border-primary/20 backdrop-blur-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-secondary">
-                    <Icon name="Car" size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Главное</h2>
-                    <p className="text-sm text-muted-foreground">Основная информация</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 rounded-lg bg-muted/30">
-                    <span className="text-sm text-muted-foreground">Владелец</span>
-                    <span className="font-semibold">{userData.name}</span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-muted/30 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Автомобиль</span>
-                      <Dialog open={carDialogOpen} onOpenChange={setCarDialogOpen}>
-                        <DialogTrigger asChild>
-                          <button className="text-primary text-xs hover:underline flex items-center gap-1">
-                            <Icon name="Settings" size={12} />
-                            Управление
-                          </button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-border max-w-[90vw] sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Мои автомобили</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            {cars.length > 0 && (
-                              <div className="space-y-2">
-                                {cars.map((car) => (
-                                  <div key={car.id} className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${car.id === selectedCarId ? "border-primary bg-primary/10" : "border-border/50 bg-muted/20 hover:bg-muted/40"}`} onClick={() => setSelectedCarId(car.id)}>
-                                    <div className="flex items-center gap-3">
-                                      <Icon name="Car" size={18} className={car.id === selectedCarId ? "text-primary" : "text-muted-foreground"} />
-                                      <div>
-                                        <p className="font-semibold text-sm">{car.brand} {car.model}</p>
-                                        <p className="text-xs text-muted-foreground">{car.year} г.</p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {car.id === selectedCarId && <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Активный</Badge>}
-                                      {cars.length > 1 && (
-                                        <button onClick={(e) => { e.stopPropagation(); deleteCar(car.id); }} className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
-                                          <Icon name="Trash2" size={14} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="border-t border-border/50 pt-4 space-y-3">
-                              <h4 className="font-semibold text-sm flex items-center gap-2">
-                                <Icon name="Plus" size={16} />
-                                Добавить автомобиль
-                              </h4>
-                              <div className="grid grid-cols-2 gap-2">
-                                <Input placeholder="Марка" value={newCar.brand} onChange={(e) => setNewCar({ ...newCar, brand: e.target.value })} className="bg-muted/30 text-sm" />
-                                <Input placeholder="Модель" value={newCar.model} onChange={(e) => setNewCar({ ...newCar, model: e.target.value })} className="bg-muted/30 text-sm" />
-                              </div>
-                              <Input placeholder="Год выпуска" value={newCar.year} onChange={(e) => setNewCar({ ...newCar, year: e.target.value })} className="bg-muted/30 text-sm" />
-                              <Button onClick={addCar} disabled={!newCar.brand || !newCar.model} className="w-full bg-gradient-to-r from-primary to-secondary border-0">
-                                <Icon name="Plus" size={16} className="mr-2" />
-                                Добавить
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+            {profileLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-24 rounded-2xl bg-card animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {cars.map((car) => (
+                  <div
+                    key={car.id}
+                    onClick={() => setSelectedCarId(String(car.id))}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                      String(car.id) === selectedCarId
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(car.id) === selectedCarId ? "bg-primary" : "bg-secondary"}`}>
+                          <Icon name="Car" size={18} className={String(car.id) === selectedCarId ? "text-black" : "text-foreground"} />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{car.brand} {car.model}</p>
+                          <p className="text-xs text-muted-foreground">{car.year || "год не указан"}</p>
+                        </div>
+                      </div>
+                      {String(car.id) === selectedCarId && (
+                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <Icon name="Check" size={12} className="text-black" />
+                        </div>
+                      )}
                     </div>
-
-                    {cars.length > 1 ? (
-                      <Select value={selectedCarId} onValueChange={setSelectedCarId}>
-                        <SelectTrigger className="bg-muted/40 border-border/50">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          {cars.map((car) => (
-                            <SelectItem key={car.id} value={car.id}>
-                              {car.brand} {car.model} ({car.year})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="font-semibold">
-                        {selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : "—"}
-                      </span>
+                    {(car.last_oil_change || car.next_oil_change) && (
+                      <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Последняя замена</p>
+                          <p className="text-xs font-medium">{car.last_oil_change || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Следующая замена</p>
+                          <p className="text-xs font-medium text-primary">{car.next_oil_change || "—"}</p>
+                        </div>
+                      </div>
                     )}
                   </div>
+                ))}
 
-                  {selectedCar && (
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/30">
-                      <span className="text-sm text-muted-foreground">Последняя замена</span>
-                      <Badge className="bg-gradient-to-r from-primary to-secondary border-0">
-                        {selectedCar.lastOilChange}
-                      </Badge>
-                    </div>
-                  )}
+                <button
+                  onClick={() => setCarDialogOpen(true)}
+                  className="w-full p-4 rounded-2xl border border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary flex items-center justify-center gap-2 transition-all"
+                >
+                  <Icon name="Plus" size={18} />
+                  <span className="text-sm font-medium">Добавить автомобиль</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: booking */}
+        {tab === "booking" && (
+          <div className="pt-5 space-y-5 animate-fade-in">
+            <div>
+              <h2 className="text-xl font-bold">Запись на обслуживание</h2>
+              <p className="text-muted-foreground text-sm">Выберите услугу и дату</p>
+            </div>
+
+            {bookingSent ? (
+              <div className="p-6 rounded-2xl bg-primary/10 border border-primary/20 text-center">
+                <div className="w-14 h-14 rounded-full bg-primary mx-auto flex items-center justify-center mb-3">
+                  <Icon name="Check" size={28} className="text-black" />
                 </div>
-
-                <Button onClick={() => setActiveTab("booking")} className="w-full mt-6 bg-gradient-to-r from-primary via-secondary to-accent hover:opacity-90 transition-all shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 border-0">
-                  <Icon name="Calendar" size={18} className="mr-2" />
-                  Записаться на замену масла
-                </Button>
-              </Card>
-
-              <Card className="p-5 bg-gradient-to-br from-card to-accent/5 border-accent/20">
-                <h3 className="font-bold mb-3 flex items-center gap-2">
-                  <Icon name="Phone" size={18} className="text-accent" />
-                  Контакты сервиса
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <p className="flex items-start gap-2">
-                    <Icon name="MapPin" size={16} className="text-muted-foreground mt-0.5" />
-                    <span>{userData.address}</span>
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <Icon name="Phone" size={16} className="text-muted-foreground" />
-                    <span>{userData.phone}</span>
-                  </p>
-                </div>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="service" className="space-y-4 animate-fade-in">
-              <Card className="p-6 bg-gradient-to-br from-card via-card to-secondary/5 border-secondary/20">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-secondary to-primary">
-                    <Icon name="FileText" size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Сервисный лист</h2>
-                    <p className="text-sm text-muted-foreground">История обслуживания</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Icon name="Car" size={20} className="text-primary" />
-                      <h3 className="font-bold">Автомобиль</h3>
-                    </div>
-                    <p className="text-lg font-semibold">
-                      {selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : "—"}
-                    </p>
-                  </div>
-
-                  {selectedCar && (
-                    <div className="p-4 rounded-xl bg-gradient-to-br from-accent/10 to-primary/10 border border-accent/20">
-                      <div className="flex items-center gap-3 mb-3">
-                        <Icon name="Droplet" size={20} className="text-accent" />
-                        <h3 className="font-bold">Замена масла</h3>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Последняя замена:</span>
-                          <Badge variant="secondary" className="bg-accent/20 text-accent border-accent/30">
-                            {selectedCar.lastOilChange}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Следующая замена:</span>
-                          <Badge className="bg-gradient-to-r from-primary to-secondary border-0">
-                            {selectedCar.nextOilChange}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-secondary/10 to-accent/10 border border-secondary/20">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Icon name="Info" size={18} className="text-secondary" />
-                      <h4 className="font-semibold text-sm">Рекомендация</h4>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedCar ? (
-                        <>Следующая замена масла рекомендуется <span className="font-semibold text-foreground">{selectedCar.nextOilChange}</span>. Своевременное обслуживание продлевает срок службы двигателя.</>
-                      ) : (
-                        "Добавьте автомобиль для получения рекомендаций."
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="booking" className="space-y-4 animate-fade-in">
-              <Card className="p-6 bg-gradient-to-br from-card via-card to-accent/5 border-accent/20">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-accent to-primary">
-                    <Icon name="Calendar" size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Запись на обслуживание</h2>
-                    <p className="text-sm text-muted-foreground">Выберите услугу и запишитесь</p>
-                  </div>
-                </div>
-
-                {bookingSent && (
-                  <div className="mb-4 p-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center gap-3">
-                    <Icon name="CheckCircle" size={20} className="text-green-500" />
-                    <p className="text-sm text-green-400 font-medium">Заявка успешно отправлена!</p>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="User" size={16} />
-                      Имя
-                    </label>
-                    <Input value={bookingName} onChange={(e) => setBookingName(e.target.value)} className="bg-muted/30 border-border/50 focus:border-primary" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="Phone" size={16} />
-                      Телефон
-                    </label>
-                    <Input type="tel" value={bookingPhone} onChange={(e) => setBookingPhone(e.target.value)} className="bg-muted/30 border-border/50 focus:border-primary" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="Wrench" size={16} />
-                      Вид услуги
-                    </label>
-                    <Select value={bookingService} onValueChange={setBookingService}>
-                      <SelectTrigger className="bg-muted/30 border-border/50">
-                        <SelectValue />
+                <p className="font-bold text-lg">Заявка принята!</p>
+                <p className="text-sm text-muted-foreground mt-1">Мы свяжемся с вами для подтверждения</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Авто */}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-2">Автомобиль</label>
+                  {cars.length === 0 ? (
+                    <button
+                      onClick={() => { setTab("home"); setCarDialogOpen(true); }}
+                      className="w-full p-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+                    >
+                      Добавьте автомобиль в профиле
+                    </button>
+                  ) : (
+                    <Select value={selectedCarId} onValueChange={setSelectedCarId}>
+                      <SelectTrigger className="bg-card border-border h-11 rounded-xl">
+                        <SelectValue placeholder="Выберите авто" />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border">
-                        {serviceTypes.map((service) => (
-                          <SelectItem key={service.id} value={service.id}>
-                            {service.label}
+                        {cars.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.brand} {c.model} {c.year ? `(${c.year})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="Car" size={16} />
-                      Автомобиль
-                    </label>
-                    {cars.length > 1 ? (
-                      <Select value={selectedCarId} onValueChange={setSelectedCarId}>
-                        <SelectTrigger className="bg-muted/30 border-border/50">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          {cars.map((car) => (
-                            <SelectItem key={car.id} value={car.id}>
-                              {car.brand} {car.model} ({car.year})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input value={selectedCar ? `${selectedCar.brand} ${selectedCar.model}` : ""} readOnly className="bg-muted/30 border-border/50" />
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="Calendar" size={16} />
-                      Дата и время
-                    </label>
-                    <Input type="datetime-local" min={getMinDateTime()} value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} className="bg-muted/30 border-border/50 focus:border-primary" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="MessageSquare" size={16} />
-                      Комментарий
-                    </label>
-                    <Textarea placeholder="Опишите проблему или вид обслуживания..." value={bookingComment} onChange={(e) => setBookingComment(e.target.value)} className="bg-muted/30 border-border/50 focus:border-primary min-h-[100px]" />
-                  </div>
-
-                  <Button type="button" onClick={handleBooking} disabled={!bookingDate || !bookingName || !bookingPhone} className="w-full bg-gradient-to-r from-accent via-primary to-secondary hover:opacity-90 transition-all shadow-lg shadow-accent/50 hover:shadow-xl hover:shadow-accent/60 border-0 h-12 disabled:opacity-40">
-                    <Icon name="Send" size={18} className="mr-2" />
-                    Отправить заявку
-                  </Button>
-                </div>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="contacts" className="space-y-4 animate-fade-in">
-              <Card className="p-6 bg-gradient-to-br from-card via-card to-primary/5 border-primary/20">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-accent">
-                    <Icon name="MapPin" size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Контакты</h2>
-                    <p className="text-sm text-muted-foreground">Как нас найти</p>
-                  </div>
+                  )}
                 </div>
 
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-muted/20 to-primary/5 border border-border/50">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/20">
-                        <Icon name="MapPin" size={20} className="text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold mb-1">Адрес</h3>
-                        <p className="text-sm text-muted-foreground">{userData.address}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-muted/20 to-secondary/5 border border-border/50">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-secondary/20">
-                        <Icon name="Phone" size={20} className="text-secondary" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold mb-1">Телефон</h3>
-                        <a href={`tel:${userData.phone}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">{userData.phone}</a>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button className="w-full bg-gradient-to-r from-secondary via-accent to-primary hover:opacity-90 transition-all shadow-lg shadow-secondary/50 hover:shadow-xl hover:shadow-secondary/60 border-0 h-12" onClick={() => window.open(userData.gisLink, "_blank")}>
-                    <Icon name="MapPin" size={18} className="mr-2" />
-                    Открыть в 2ГИС
-                  </Button>
+                {/* Услуга */}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-2">Вид услуги</label>
+                  <Select value={bookingService} onValueChange={setBookingService}>
+                    <SelectTrigger className="bg-card border-border h-11 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {SERVICE_TYPES.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
 
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
-          <Card className="p-4 bg-card/80 backdrop-blur-xl border-border/50 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-gradient-to-r from-primary to-secondary animate-pulse" />
-                <span className="text-xs text-muted-foreground">Следующее ТО через</span>
+                {/* Дата */}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-2">Дата и время</label>
+                  <Input
+                    type="datetime-local"
+                    value={bookingDate}
+                    min={getMinDT()}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    className="bg-card border-border h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Комментарий */}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-2">Комментарий (необязательно)</label>
+                  <Textarea
+                    placeholder="Опишите проблему или пожелания..."
+                    value={bookingComment}
+                    onChange={(e) => setBookingComment(e.target.value)}
+                    className="bg-card border-border rounded-xl resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleBooking}
+                  disabled={loading || !bookingDate}
+                  className="w-full h-12 bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl text-base"
+                >
+                  {loading ? "Отправляем..." : "Записаться"}
+                </Button>
               </div>
-              <Badge className="bg-gradient-to-r from-primary to-secondary border-0">
-                {selectedCar?.nextOilChange || "—"}
-              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* TAB: history */}
+        {tab === "history" && (
+          <div className="pt-5 space-y-5 animate-fade-in">
+            <div>
+              <h2 className="text-xl font-bold">История обращений</h2>
+              <p className="text-muted-foreground text-sm">{bookings.length} заявок</p>
             </div>
-          </Card>
+
+            {profileLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => <div key={i} className="h-24 rounded-2xl bg-card animate-pulse" />)}
+              </div>
+            ) : bookings.length === 0 ? (
+              <div className="py-16 text-center">
+                <Icon name="ClipboardList" size={48} className="text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">Заявок пока нет</p>
+                <button
+                  onClick={() => setTab("booking")}
+                  className="mt-3 text-primary text-sm hover:underline"
+                >
+                  Записаться на обслуживание
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {bookings.map((b) => {
+                  const st = STATUS_LABELS[b.status] || STATUS_LABELS.new;
+                  return (
+                    <div key={b.id} className="p-4 rounded-2xl bg-card border border-border">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <p className="font-semibold text-sm">{b.service || "Услуга не указана"}</p>
+                          {b.car_label && (
+                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                              <Icon name="Car" size={12} />
+                              {b.car_label}
+                            </p>
+                          )}
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full border whitespace-nowrap ${st.color}`}>
+                          {st.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {b.scheduled_at && (
+                          <span className="flex items-center gap-1">
+                            <Icon name="Calendar" size={11} />
+                            {formatDT(b.scheduled_at)}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Icon name="Clock" size={11} />
+                          {formatDT(b.created_at)}
+                        </span>
+                      </div>
+                      {b.comment && (
+                        <p className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-2 py-1.5">
+                          {b.comment}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: contacts */}
+        {tab === "contacts" && (
+          <div className="pt-5 space-y-5 animate-fade-in">
+            <div>
+              <h2 className="text-xl font-bold">Контакты</h2>
+              <p className="text-muted-foreground text-sm">АвтоСервис — замена масел</p>
+            </div>
+
+            <div className="space-y-3">
+              <a href={`tel:${CONTACTS.phone}`} className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all group">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                  <Icon name="Phone" size={18} className="text-black" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Телефон</p>
+                  <p className="font-semibold">{CONTACTS.phone}</p>
+                </div>
+              </a>
+
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border">
+                <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                  <Icon name="MapPin" size={18} className="text-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Адрес</p>
+                  <p className="font-semibold text-sm">{CONTACTS.address}</p>
+                </div>
+              </div>
+
+              <a href={CONTACTS.gis} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                  <Icon name="Navigation" size={18} className="text-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Построить маршрут</p>
+                  <p className="font-semibold text-sm">Открыть в 2GIS</p>
+                </div>
+                <Icon name="ExternalLink" size={16} className="text-muted-foreground ml-auto" />
+              </a>
+
+              <div className="p-4 rounded-2xl bg-card border border-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                    <Icon name="Clock" size={18} className="text-foreground" />
+                  </div>
+                  <p className="font-semibold">Режим работы</p>
+                </div>
+                <div className="space-y-1.5 text-sm">
+                  {[
+                    { days: "Пн — Пт", hours: "09:00 — 19:00" },
+                    { days: "Суббота", hours: "10:00 — 17:00" },
+                    { days: "Воскресенье", hours: "Выходной" },
+                  ].map((row) => (
+                    <div key={row.days} className="flex justify-between">
+                      <span className="text-muted-foreground">{row.days}</span>
+                      <span className={row.hours === "Выходной" ? "text-muted-foreground" : "font-medium"}>{row.hours}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom nav */}
+      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border">
+        <div className="max-w-md mx-auto flex">
+          {(
+            [
+              { key: "home", icon: "Car", label: "Авто" },
+              { key: "booking", icon: "Calendar", label: "Запись" },
+              { key: "history", icon: "ClipboardList", label: "История" },
+              { key: "contacts", icon: "Phone", label: "Контакты" },
+            ] as { key: Tab; icon: string; label: string }[]
+          ).map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setTab(item.key)}
+              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors ${
+                tab === item.key ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon name={item.icon} size={20} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Add car dialog */}
+      <Dialog open={carDialogOpen} onOpenChange={setCarDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-[90vw] sm:max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Добавить автомобиль</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Марка (Toyota, BMW...)" value={newCar.brand} onChange={(e) => setNewCar((p) => ({ ...p, brand: e.target.value }))} className="bg-background border-border rounded-xl" />
+            <Input placeholder="Модель (Camry, X5...)" value={newCar.model} onChange={(e) => setNewCar((p) => ({ ...p, model: e.target.value }))} className="bg-background border-border rounded-xl" />
+            <Input placeholder="Год выпуска" value={newCar.year} onChange={(e) => setNewCar((p) => ({ ...p, year: e.target.value }))} className="bg-background border-border rounded-xl" />
+            <Input placeholder="Дата последней замены масла" value={newCar.last_oil_change} onChange={(e) => setNewCar((p) => ({ ...p, last_oil_change: e.target.value }))} className="bg-background border-border rounded-xl" />
+            <Input placeholder="Дата следующей замены масла" value={newCar.next_oil_change} onChange={(e) => setNewCar((p) => ({ ...p, next_oil_change: e.target.value }))} className="bg-background border-border rounded-xl" />
+            <Button onClick={addCar} disabled={!newCar.brand || !newCar.model} className="w-full bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl">
+              Добавить
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
