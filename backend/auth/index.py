@@ -2,6 +2,8 @@ import json
 import os
 import random
 import string
+import urllib.request
+import urllib.parse
 import psycopg2
 from datetime import datetime, timedelta
 
@@ -14,8 +16,33 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
+def send_sms(phone: str, message: str) -> bool:
+    """Отправка SMS через smsc.ru. Возвращает True при успехе."""
+    smsc_login = os.environ.get("SMSC_LOGIN", "")
+    smsc_password = os.environ.get("SMSC_PASSWORD", "")
+    if not smsc_login or not smsc_password:
+        return False
+    # Убираем +, smsc принимает 7XXXXXXXXXX
+    clean_phone = phone.lstrip("+")
+    params = urllib.parse.urlencode({
+        "login": smsc_login,
+        "psw": smsc_password,
+        "phones": clean_phone,
+        "mes": message,
+        "fmt": 3,  # JSON ответ
+        "charset": "utf-8",
+    })
+    url = f"https://smsc.ru/sys/send.php?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            return "error" not in result
+    except Exception:
+        return False
+
+
 def handler(event: dict, context) -> dict:
-    """Авторизация: отправка OTP по SMS и вход администратора."""
+    """Авторизация: отправка OTP по SMS через smsc.ru и вход администратора."""
     cors = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -54,13 +81,15 @@ def handler(event: dict, context) -> dict:
         cur.close()
         conn.close()
 
-        # В реальной системе здесь отправка SMS через провайдера
-        # Сейчас код возвращаем в ответе для демо-режима
-        return {
-            "statusCode": 200,
-            "headers": cors,
-            "body": json.dumps({"ok": True, "demo_code": code, "message": "Код отправлен"}),
-        }
+        sms_text = f"АвтоСервис: ваш код входа {code}. Никому не сообщайте."
+        sms_sent = send_sms(phone, sms_text)
+
+        response = {"ok": True, "message": "Код отправлен"}
+        # Если SMS не отправлена (нет ключей/ошибка) — возвращаем код для демо
+        if not sms_sent:
+            response["demo_code"] = code
+
+        return {"statusCode": 200, "headers": cors, "body": json.dumps(response)}
 
     # POST /verify-otp — проверить код
     if method == "POST" and path.endswith("/verify-otp"):
@@ -84,7 +113,6 @@ def handler(event: dict, context) -> dict:
         otp_id = row[0]
         cur.execute(f"UPDATE {SCHEMA}.otp_codes SET used=TRUE WHERE id=%s", (otp_id,))
 
-        # Найти или создать пользователя
         cur.execute(f"SELECT id, name FROM {SCHEMA}.users WHERE phone=%s", (phone,))
         user_row = cur.fetchone()
         if user_row:

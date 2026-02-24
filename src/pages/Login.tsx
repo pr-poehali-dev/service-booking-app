@@ -5,16 +5,13 @@ import { Input } from "@/components/ui/input";
 import Icon from "@/components/ui/icon";
 import func2url from "../../backend/func2url.json";
 
-type Step = "choose" | "phone" | "otp" | "admin";
+type Step = "phone" | "otp";
 
 const Login = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>("choose");
+  const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [adminLogin, setAdminLogin] = useState("");
-  const [adminPass, setAdminPass] = useState("");
-  const [demoCode, setDemoCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,7 +46,6 @@ const Login = () => {
       });
       const data = await res.json();
       if (data.ok) {
-        setDemoCode(data.demo_code || "");
         setStep("otp");
       } else {
         setError(data.error || "Ошибка отправки");
@@ -90,34 +86,9 @@ const Login = () => {
     }
   };
 
-  const adminLoginHandler = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch(`${func2url.auth}/admin-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: adminLogin, password: adminPass }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        localStorage.setItem("admin_token", data.token);
-        localStorage.setItem("user_role", "admin");
-        navigate("/admin_panel");
-      } else {
-        setError(data.error || "Неверный логин или пароль");
-      }
-    } catch {
-      setError("Ошибка соединения");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4">
             <Icon name="Wrench" size={32} className="text-black" />
@@ -126,52 +97,13 @@ const Login = () => {
           <p className="text-muted-foreground text-sm mt-1">Замена масел и жидкостей</p>
         </div>
 
-        {/* STEP: choose */}
-        {step === "choose" && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setStep("phone")}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <Icon name="Smartphone" size={20} className="text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-foreground">Войти по номеру телефона</p>
-                <p className="text-xs text-muted-foreground">Получите SMS с кодом</p>
-              </div>
-              <Icon name="ChevronRight" size={18} className="text-muted-foreground ml-auto" />
-            </button>
-
-            <button
-              onClick={() => setStep("admin")}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <Icon name="Shield" size={20} className="text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-foreground">Войти как администратор</p>
-                <p className="text-xs text-muted-foreground">Для сотрудников сервиса</p>
-              </div>
-              <Icon name="ChevronRight" size={18} className="text-muted-foreground ml-auto" />
-            </button>
-          </div>
-        )}
-
-        {/* STEP: phone */}
         {step === "phone" && (
           <div className="space-y-4">
-            <button
-              onClick={() => setStep("choose")}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm transition-colors mb-2"
-            >
-              <Icon name="ArrowLeft" size={16} />
-              Назад
-            </button>
             <div>
               <p className="font-semibold text-foreground mb-1">Номер телефона</p>
-              <p className="text-sm text-muted-foreground mb-4">Отправим SMS с кодом подтверждения</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Отправим SMS с кодом подтверждения
+              </p>
               <Input
                 type="tel"
                 placeholder="+7 (___) ___-__-__"
@@ -179,6 +111,7 @@ const Login = () => {
                 onChange={(e) => setPhone(formatPhone(e.target.value))}
                 className="bg-card border-border text-foreground placeholder:text-muted-foreground h-12 text-base rounded-xl"
                 onKeyDown={(e) => e.key === "Enter" && sendOtp()}
+                autoFocus
               />
             </div>
             {error && <p className="text-destructive text-sm">{error}</p>}
@@ -192,7 +125,6 @@ const Login = () => {
           </div>
         )}
 
-        {/* STEP: otp */}
         {step === "otp" && (
           <div className="space-y-4">
             <button
@@ -204,13 +136,9 @@ const Login = () => {
             </button>
             <div>
               <p className="font-semibold text-foreground mb-1">Введите код из SMS</p>
-              <p className="text-sm text-muted-foreground mb-4">Отправили на {phone}</p>
-              {demoCode && (
-                <div className="mb-3 p-3 rounded-xl bg-primary/10 border border-primary/20">
-                  <p className="text-xs text-muted-foreground">Демо-режим — ваш код:</p>
-                  <p className="text-2xl font-bold text-primary tracking-widest">{demoCode}</p>
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground mb-4">
+                Отправили на <span className="text-foreground font-medium">{phone}</span>
+              </p>
               <Input
                 type="text"
                 inputMode="numeric"
@@ -218,60 +146,26 @@ const Login = () => {
                 placeholder="_ _ _ _"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                className="bg-card border-border text-foreground placeholder:text-muted-foreground h-12 text-xl text-center tracking-[0.5em] rounded-xl"
+                className="bg-card border-border text-foreground placeholder:text-muted-foreground h-14 text-2xl text-center tracking-[0.5em] rounded-xl font-bold"
                 onKeyDown={(e) => e.key === "Enter" && verifyOtp()}
+                autoFocus
               />
             </div>
             {error && <p className="text-destructive text-sm">{error}</p>}
             <Button
               onClick={verifyOtp}
-              disabled={loading}
+              disabled={loading || otp.length < 4}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl text-base"
             >
               {loading ? "Проверяем..." : "Войти"}
             </Button>
-          </div>
-        )}
-
-        {/* STEP: admin */}
-        {step === "admin" && (
-          <div className="space-y-4">
             <button
-              onClick={() => setStep("choose")}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm transition-colors mb-2"
-            >
-              <Icon name="ArrowLeft" size={16} />
-              Назад
-            </button>
-            <div>
-              <p className="font-semibold text-foreground mb-1">Вход для администратора</p>
-              <p className="text-sm text-muted-foreground mb-4">Введите логин и пароль</p>
-              <div className="space-y-3">
-                <Input
-                  type="text"
-                  placeholder="Логин"
-                  value={adminLogin}
-                  onChange={(e) => setAdminLogin(e.target.value)}
-                  className="bg-card border-border text-foreground placeholder:text-muted-foreground h-12 rounded-xl"
-                />
-                <Input
-                  type="password"
-                  placeholder="Пароль"
-                  value={adminPass}
-                  onChange={(e) => setAdminPass(e.target.value)}
-                  className="bg-card border-border text-foreground placeholder:text-muted-foreground h-12 rounded-xl"
-                  onKeyDown={(e) => e.key === "Enter" && adminLoginHandler()}
-                />
-              </div>
-            </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
-            <Button
-              onClick={adminLoginHandler}
+              onClick={sendOtp}
               disabled={loading}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl text-base"
+              className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
             >
-              {loading ? "Входим..." : "Войти"}
-            </Button>
+              Отправить код повторно
+            </button>
           </div>
         )}
       </div>
