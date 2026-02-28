@@ -59,7 +59,7 @@ def handler(event: dict, context) -> dict:
         body = json.loads(event["body"])
 
     # POST /send-otp — отправить код
-    if method == "POST" and path.endswith("/send-otp"):
+    if method == "POST" and (path.endswith("/send-otp") or body.get("action") == "send-otp"):
         phone = body.get("phone", "").strip()
         if not phone:
             return {"statusCode": 400, "headers": cors, "body": json.dumps({"error": "Укажите номер телефона"})}
@@ -92,7 +92,7 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": cors, "body": json.dumps(response)}
 
     # POST /verify-otp — проверить код
-    if method == "POST" and path.endswith("/verify-otp"):
+    if method == "POST" and (path.endswith("/verify-otp") or body.get("action") == "verify-otp"):
         phone = body.get("phone", "").strip()
         code = body.get("code", "").strip()
         if not phone or not code:

@@ -39,10 +39,10 @@ const Login = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${func2url.auth}/send-otp`, {
+      const res = await fetch(func2url.auth, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: rawPhone() }),
+        body: JSON.stringify({ action: "send-otp", phone: rawPhone() }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -65,10 +65,10 @@ const Login = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${func2url.auth}/verify-otp`, {
+      const res = await fetch(func2url.auth, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: rawPhone(), code: otp }),
+        body: JSON.stringify({ action: "verify-otp", phone: rawPhone(), code: otp }),
       });
       const data = await res.json();
       if (data.ok) {

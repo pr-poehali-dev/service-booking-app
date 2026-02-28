@@ -8,6 +8,14 @@
       "bodyMatcher": "partial"
     },
     {
+      "name": "Send OTP no phone",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "send-otp", "phone": ""},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    },
+    {
       "name": "Admin login wrong password",
       "method": "POST",
       "path": "/",
