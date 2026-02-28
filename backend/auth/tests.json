@@ -6,6 +6,15 @@
       "path": "/",
       "expectedStatus": 200,
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Admin login wrong password",
+      "method": "POST",
+      "path": "/admin-login",
+      "body": {"login": "wrong", "password": "wrong"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Неверный логин или пароль"},
+      "bodyMatcher": "partial"
     }
   ]
 }
