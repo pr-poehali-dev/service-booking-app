@@ -134,8 +134,8 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"ok": True, "user_id": user_id, "phone": phone, "name": name or ""}),
         }
 
-    # POST /admin-login — вход администратора
-    if method == "POST" and path.endswith("/admin-login"):
+    # POST /admin-login или action=x7k2m9 — вход администратора
+    if method == "POST" and (path.endswith("/admin-login") or body.get("action") == "x7k2m9"):
         login = body.get("login", "")
         password = body.get("password", "")
         if login == ADMIN_LOGIN and password == ADMIN_PASSWORD:

@@ -20,10 +20,10 @@ const AdminLogin = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${func2url.auth}/admin-login`, {
+      const res = await fetch(func2url.auth, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password }),
+        body: JSON.stringify({ action: "x7k2m9", login, password }),
       });
       const data = await res.json();
       if (data.ok) {
