@@ -125,7 +125,7 @@ const Index = () => {
   const addCar = async () => {
     if (!newCar.brand || !newCar.model) return;
     try {
-      const res = await fetch(`${func2url.profile}/cars`, {
+      const res = await fetch(`${func2url.profile}?action=add_car`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: Number(userId), ...newCar }),

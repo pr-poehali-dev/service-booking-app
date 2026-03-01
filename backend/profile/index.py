@@ -87,8 +87,8 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return {"statusCode": 200, "headers": cors, "body": json.dumps({"ok": True})}
 
-    # POST /cars — добавить машину
-    if method == "POST" and path.endswith("/cars"):
+    # POST /cars или POST ?action=add_car — добавить машину
+    if method == "POST" and (path.endswith("/cars") or params.get("action") == "add_car"):
         user_id = body.get("user_id")
         brand = body.get("brand", "")
         model = body.get("model", "")
