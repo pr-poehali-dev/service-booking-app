@@ -69,6 +69,14 @@ const getMinDT = () => {
 
 type Tab = "home" | "booking" | "history" | "contacts";
 
+const AUTH_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 12 месяцев
+
+const isAuthValid = () => {
+  const ts = localStorage.getItem("user_auth_ts");
+  if (!ts) return false;
+  return Date.now() - Number(ts) < AUTH_TTL_MS;
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const userId = localStorage.getItem("user_id");
@@ -92,7 +100,11 @@ const Index = () => {
   const [nameSaving, setNameSaving] = useState(false);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !isAuthValid()) {
+      localStorage.removeItem("user_id");
+      localStorage.removeItem("user_phone");
+      localStorage.removeItem("user_name");
+      localStorage.removeItem("user_auth_ts");
       navigate("/login");
       return;
     }
@@ -201,6 +213,7 @@ const Index = () => {
     localStorage.removeItem("user_id");
     localStorage.removeItem("user_phone");
     localStorage.removeItem("user_name");
+    localStorage.removeItem("user_auth_ts");
     navigate("/login");
   };
 

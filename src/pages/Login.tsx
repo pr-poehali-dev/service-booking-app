@@ -75,6 +75,7 @@ const Login = () => {
         localStorage.setItem("user_id", String(data.user_id));
         localStorage.setItem("user_phone", data.phone);
         localStorage.setItem("user_name", data.name || "");
+        localStorage.setItem("user_auth_ts", String(Date.now()));
         navigate("/");
       } else {
         setError(data.error || "Неверный код");

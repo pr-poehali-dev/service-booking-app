@@ -1,5 +1,7 @@
 import json
 import os
+import urllib.request
+import urllib.parse
 import psycopg2
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p1259797_service_booking_app")
@@ -8,6 +10,32 @@ ADMIN_TOKEN = "admin_secret_token_2024"
 
 def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
+
+
+def send_sms_smsc(phones: list, message: str) -> dict:
+    """Отправка SMS через smsc.ru нескольким получателям."""
+    login = os.environ.get("SMSC_LOGIN", "")
+    password = os.environ.get("SMSC_PASSWORD", "")
+    if not login or not password:
+        return {"ok": False, "error": "SMSC credentials not configured"}
+    clean_phones = ";".join(p.lstrip("+") for p in phones)
+    params = urllib.parse.urlencode({
+        "login": login,
+        "psw": password,
+        "phones": clean_phones,
+        "mes": message,
+        "fmt": 3,
+        "charset": "utf-8",
+    })
+    url = f"https://smsc.ru/sys/send.php?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            if "error" in result:
+                return {"ok": False, "error": result.get("error_code", result["error"])}
+            return {"ok": True, "cnt": result.get("cnt", len(phones))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def check_admin(event):
@@ -146,7 +174,7 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return {"statusCode": 200, "headers": cors, "body": json.dumps({"ok": True})}
 
-    # POST ?action=sms_broadcast — SMS рассылка всем пользователям
+    # POST ?action=sms_broadcast — SMS рассылка всем пользователям через SMSC.ru
     if method == "POST" and action == "sms_broadcast":
         message = body.get("message", "").strip()
         if not message:
@@ -154,11 +182,16 @@ def handler(event: dict, context) -> dict:
 
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute(f"SELECT phone FROM {SCHEMA}.users")
+        cur.execute(f"SELECT phone FROM {SCHEMA}.users WHERE phone IS NOT NULL AND phone != ''")
         phones = [r[0] for r in cur.fetchall()]
         count = len(phones)
 
+        sms_result = {"ok": False, "error": "Нет получателей"}
+        if phones:
+            sms_result = send_sms_smsc(phones, message)
+
         for phone in phones:
+            status = "sent" if sms_result.get("ok") else "failed"
             cur.execute(
                 f"INSERT INTO {SCHEMA}.sms_log (phone, message, type) VALUES (%s, %s, 'broadcast')",
                 (phone, message),
@@ -172,10 +205,15 @@ def handler(event: dict, context) -> dict:
         cur.close()
         conn.close()
 
+        if sms_result.get("ok"):
+            msg = f"SMS отправлено {count} клиентам"
+        else:
+            msg = f"Ошибка отправки SMS: {sms_result.get('error', 'неизвестная ошибка')}"
+
         return {
             "statusCode": 200,
             "headers": cors,
-            "body": json.dumps({"ok": True, "sent_to": count, "message": f"Рассылка отправлена {count} пользователям"}),
+            "body": json.dumps({"ok": sms_result.get("ok", False), "sent_to": count, "message": msg, "sms_error": sms_result.get("error")}),
         }
 
     # GET ?action=stats — статистика
