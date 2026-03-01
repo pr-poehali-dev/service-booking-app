@@ -88,7 +88,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 pb-24">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4">
@@ -169,6 +169,38 @@ const Login = () => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Инструкция для iPhone */}
+      <div className="w-full max-w-sm mt-10">
+        <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Icon name="Smartphone" size={16} className="text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Добавить на экран iPhone</p>
+              <p className="text-xs text-muted-foreground">Открывайте как приложение</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {[
+              { step: "1", icon: "Share2", text: 'Нажмите кнопку «Поделиться» внизу Safari' },
+              { step: "2", icon: "PlusSquare", text: '«На экран «Домой»»' },
+              { step: "3", icon: "Check", text: '«Добавить» — готово! Ярлык «ОЙЛ СЕРВИС» на рабочем столе' },
+            ].map(({ step, icon, text }) => (
+              <div key={step} className="flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-primary text-[10px] font-bold">{step}</span>
+                </div>
+                <div className="flex items-start gap-2 flex-1">
+                  <Icon name={icon} size={14} className="text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-snug">{text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
