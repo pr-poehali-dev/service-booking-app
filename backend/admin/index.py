@@ -19,7 +19,7 @@ def handler(event: dict, context) -> dict:
     """Административные функции: пользователи, заявки, SMS-рассылки."""
     cors = {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-User-Id, X-Auth-Token",
     }
 
@@ -30,13 +30,14 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 403, "headers": cors, "body": json.dumps({"error": "Нет доступа"})}
 
     method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
+    params = event.get("queryStringParameters") or {}
+    action = params.get("action", "")
     body = {}
     if event.get("body"):
         body = json.loads(event["body"])
 
-    # GET /users — все пользователи с машинами и заявками
-    if method == "GET" and path.endswith("/users"):
+    # GET ?action=users — все пользователи с машинами и заявками
+    if method == "GET" and action == "users":
         conn = get_conn()
         cur = conn.cursor()
         cur.execute(
@@ -46,8 +47,9 @@ def handler(event: dict, context) -> dict:
                 LEFT JOIN {SCHEMA}.bookings b ON b.user_id = u.id
                 GROUP BY u.id ORDER BY u.created_at DESC"""
         )
+        rows = cur.fetchall()
         users = []
-        for r in cur.fetchall():
+        for r in rows:
             uid = r[0]
             cur2 = conn.cursor()
             cur2.execute(
@@ -86,13 +88,13 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return {"statusCode": 200, "headers": cors, "body": json.dumps({"users": users})}
 
-    # GET /bookings — все заявки
-    if method == "GET" and path.endswith("/bookings"):
+    # GET ?action=bookings — все заявки
+    if method == "GET" and action == "bookings":
         conn = get_conn()
         cur = conn.cursor()
         cur.execute(
             f"""SELECT b.id, b.user_name, b.phone, b.car_label, b.service,
-                    b.scheduled_at, b.comment, b.status, b.created_at, u.name
+                    b.scheduled_at, b.comment, b.status, b.created_at, u.name, b.user_id
                 FROM {SCHEMA}.bookings b
                 LEFT JOIN {SCHEMA}.users u ON u.id = b.user_id
                 ORDER BY b.created_at DESC"""
@@ -108,6 +110,7 @@ def handler(event: dict, context) -> dict:
                 "comment": r[6] or "",
                 "status": r[7] or "new",
                 "created_at": r[8].isoformat() if r[8] else None,
+                "user_id": r[10],
             }
             for r in cur.fetchall()
         ]
@@ -115,8 +118,22 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return {"statusCode": 200, "headers": cors, "body": json.dumps({"bookings": bookings})}
 
-    # POST /sms-broadcast — SMS рассылка всем пользователям
-    if method == "POST" and path.endswith("/sms-broadcast"):
+    # PUT ?action=booking_status — обновить статус заявки
+    if method == "PUT" and action == "booking_status":
+        booking_id = body.get("booking_id")
+        status = body.get("status")
+        if not booking_id or not status:
+            return {"statusCode": 400, "headers": cors, "body": json.dumps({"error": "Укажите booking_id и status"})}
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.bookings SET status=%s WHERE id=%s", (status, booking_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"statusCode": 200, "headers": cors, "body": json.dumps({"ok": True})}
+
+    # POST ?action=sms_broadcast — SMS рассылка всем пользователям
+    if method == "POST" and action == "sms_broadcast":
         message = body.get("message", "").strip()
         if not message:
             return {"statusCode": 400, "headers": cors, "body": json.dumps({"error": "Укажите текст сообщения"})}
@@ -127,7 +144,6 @@ def handler(event: dict, context) -> dict:
         phones = [r[0] for r in cur.fetchall()]
         count = len(phones)
 
-        # Логируем все отправки
         for phone in phones:
             cur.execute(
                 f"INSERT INTO {SCHEMA}.sms_log (phone, message, type) VALUES (%s, %s, 'broadcast')",
@@ -148,8 +164,8 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"ok": True, "sent_to": count, "message": f"Рассылка отправлена {count} пользователям"}),
         }
 
-    # GET /stats — статистика
-    if method == "GET" and path.endswith("/stats"):
+    # GET ?action=stats — статистика
+    if method == "GET" and action == "stats":
         conn = get_conn()
         cur = conn.cursor()
         cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.users")

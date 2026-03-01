@@ -206,8 +206,8 @@ const Index = () => {
 
   const CONTACTS = {
     address: "Анивская улица, 145, Южно-Сахалинск",
-    phone: "+7 (900) 660-37-37",
-    gis: "https://2gis.ru",
+    phone: "+7 (914) 757-17-07",
+    gis: "https://2gis.ru/yuzhnosakhalinsk/firm/70000001039261233",
   };
 
   return (
@@ -330,13 +330,13 @@ const Index = () => {
                 <Icon name="MapPin" size={16} className="text-primary" />
                 <p className="font-semibold text-sm">Контакты сервиса</p>
               </div>
-              <a href="tel:+79147571707" className="flex items-center gap-3 group">
+              <a href={`tel:${CONTACTS.phone.replace(/\D/g, "")}`} className="flex items-center gap-3 group">
                 <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <Icon name="Phone" size={15} className="text-primary" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Телефон</p>
-                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">+7 (914) 757-17-07</p>
+                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">{CONTACTS.phone}</p>
                 </div>
               </a>
               <div className="flex items-center gap-3">
