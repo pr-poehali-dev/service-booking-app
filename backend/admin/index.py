@@ -11,7 +11,21 @@ def get_conn():
 
 
 def check_admin(event):
-    token = event.get("headers", {}).get("X-Auth-Token", "")
+    headers = event.get("headers") or {}
+    params = event.get("queryStringParameters") or {}
+    body = {}
+    if event.get("body"):
+        try:
+            body = json.loads(event["body"])
+        except Exception:
+            pass
+    token = (
+        headers.get("X-Auth-Token")
+        or headers.get("x-auth-token")
+        or params.get("token")
+        or body.get("token")
+        or ""
+    )
     return token == ADMIN_TOKEN
 
 

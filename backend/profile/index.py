@@ -73,8 +73,8 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return {"statusCode": 200, "headers": cors, "body": json.dumps({"user": user, "cars": cars, "bookings": bookings})}
 
-    # PUT /name — обновить имя
-    if method == "PUT" and path.endswith("/name"):
+    # PUT ?action=update_name — обновить имя
+    if method == "PUT" and (params.get("action") == "update_name" or path.endswith("/name")):
         user_id = body.get("user_id")
         name = body.get("name", "").strip()
         if not user_id or not name:

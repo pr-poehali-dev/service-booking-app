@@ -86,9 +86,9 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
     setLoading(true);
     try {
       const [usersRes, bookingsRes, statsRes] = await Promise.all([
-        fetch(`${func2url.admin}?action=users`, { headers }),
-        fetch(`${func2url.admin}?action=bookings`, { headers }),
-        fetch(`${func2url.admin}?action=stats`, { headers }),
+        fetch(`${func2url.admin}?action=users&token=${token}`, { headers }),
+        fetch(`${func2url.admin}?action=bookings&token=${token}`, { headers }),
+        fetch(`${func2url.admin}?action=stats&token=${token}`, { headers }),
       ]);
       const ud = await usersRes.json();
       const bd = await bookingsRes.json();
@@ -106,7 +106,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
   const updateStatus = async (bookingId: number, status: string) => {
     setStatusUpdating(bookingId);
     try {
-      await fetch(`${func2url.admin}?action=booking_status`, {
+      await fetch(`${func2url.admin}?action=booking_status&token=${token}`, {
         method: "PUT",
         headers,
         body: JSON.stringify({ booking_id: bookingId, status }),
@@ -124,7 +124,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
     setSmsSending(true);
     setSmsResult("");
     try {
-      const res = await fetch(`${func2url.admin}?action=sms_broadcast`, {
+      const res = await fetch(`${func2url.admin}?action=sms_broadcast&token=${token}`, {
         method: "POST",
         headers,
         body: JSON.stringify({ message: smsText }),

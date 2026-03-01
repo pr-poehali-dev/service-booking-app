@@ -179,7 +179,7 @@ const Index = () => {
     if (!nameInput.trim()) return;
     setNameSaving(true);
     try {
-      const res = await fetch(`${func2url.profile}/name`, {
+      const res = await fetch(`${func2url.profile}?action=update_name`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: Number(userId), name: nameInput.trim() }),
