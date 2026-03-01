@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import AdminPanel from "./pages/AdminPanel";
 import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
 import NotFound from "./pages/NotFound";
@@ -21,7 +20,6 @@ const App = () => (
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Index />} />
-          <Route path="/admin_panel" element={<AdminPanel />} />
           <Route path="/x7k2m9" element={<AdminLogin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -87,6 +87,9 @@ const Index = () => {
   const [bookingSent, setBookingSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameInput, setNameInput] = useState(localStorage.getItem("user_name") || "");
+  const [nameSaving, setNameSaving] = useState(false);
 
   useEffect(() => {
     if (!userId) {
@@ -172,6 +175,28 @@ const Index = () => {
     }
   };
 
+  const saveName = async () => {
+    if (!nameInput.trim()) return;
+    setNameSaving(true);
+    try {
+      const res = await fetch(`${func2url.profile}/name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: Number(userId), name: nameInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setUserName(nameInput.trim());
+        localStorage.setItem("user_name", nameInput.trim());
+        setNameEditing(false);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setNameSaving(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("user_id");
     localStorage.removeItem("user_phone");
@@ -204,74 +229,192 @@ const Index = () => {
       </div>
 
       <div className="max-w-md mx-auto px-4 pb-28">
-        {/* TAB: home */}
+        {/* TAB: home (Профиль) */}
         {tab === "home" && (
           <div className="pt-5 space-y-5 animate-fade-in">
             <div>
-              <h2 className="text-xl font-bold">
-                {userName ? `Привет, ${userName.split(" ")[0]}` : "Личный кабинет"}
-              </h2>
-              <p className="text-muted-foreground text-sm">Ваши автомобили</p>
+              <h2 className="text-xl font-bold">Профиль</h2>
+              <p className="text-muted-foreground text-sm">{userPhone}</p>
             </div>
 
-            {profileLoading ? (
-              <div className="space-y-3">
-                {[1, 2].map((i) => (
-                  <div key={i} className="h-24 rounded-2xl bg-card animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {cars.map((car) => (
-                  <div
-                    key={car.id}
-                    onClick={() => setSelectedCarId(String(car.id))}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                      String(car.id) === selectedCarId
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-card hover:border-primary/30"
-                    }`}
+            {/* ФИО */}
+            <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon name="User" size={16} className="text-primary" />
+                  <p className="font-semibold text-sm">ФИО</p>
+                </div>
+                {!nameEditing && (
+                  <button
+                    onClick={() => { setNameInput(userName); setNameEditing(true); }}
+                    className="text-xs text-primary hover:underline"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(car.id) === selectedCarId ? "bg-primary" : "bg-secondary"}`}>
-                          <Icon name="Car" size={18} className={String(car.id) === selectedCarId ? "text-black" : "text-foreground"} />
-                        </div>
-                        <div>
-                          <p className="font-semibold">{car.brand} {car.model}</p>
-                          <p className="text-xs text-muted-foreground">{car.year || "год не указан"}</p>
-                        </div>
+                    Изменить
+                  </button>
+                )}
+              </div>
+              {nameEditing ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Введите ФИО"
+                    className="bg-background border-border rounded-xl h-10 text-sm"
+                    autoFocus
+                    onKeyDown={(e) => e.key === "Enter" && saveName()}
+                  />
+                  <Button
+                    onClick={saveName}
+                    disabled={nameSaving || !nameInput.trim()}
+                    className="h-10 px-4 bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl text-sm shrink-0"
+                  >
+                    {nameSaving ? "..." : "Сохранить"}
+                  </Button>
+                  <button
+                    onClick={() => setNameEditing(false)}
+                    className="h-10 px-2 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  >
+                    <Icon name="X" size={16} />
+                  </button>
+                </div>
+              ) : (
+                <p className="text-foreground">{userName || <span className="text-muted-foreground italic">Не указано</span>}</p>
+              )}
+            </div>
+
+            {/* Последнее обращение */}
+            {(() => {
+              const lastBooking = bookings[0];
+              return (
+                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon name="History" size={16} className="text-primary" />
+                    <p className="font-semibold text-sm">Последнее обращение</p>
+                  </div>
+                  {profileLoading ? (
+                    <div className="h-8 rounded-lg bg-muted animate-pulse" />
+                  ) : lastBooking ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{lastBooking.service}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        {lastBooking.car_label && (
+                          <span className="flex items-center gap-1">
+                            <Icon name="Car" size={11} />
+                            {lastBooking.car_label}
+                          </span>
+                        )}
+                        {lastBooking.scheduled_at && (
+                          <span className="flex items-center gap-1">
+                            <Icon name="Calendar" size={11} />
+                            {formatDT(lastBooking.scheduled_at)}
+                          </span>
+                        )}
                       </div>
-                      {String(car.id) === selectedCarId && (
-                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Icon name="Check" size={12} className="text-black" />
+                      {(() => {
+                        const st = STATUS_LABELS[lastBooking.status] || STATUS_LABELS.new;
+                        return (
+                          <span className={`inline-block text-xs px-2 py-0.5 rounded-full border ${st.color}`}>{st.label}</span>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Обращений пока не было</p>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Контакты сервиса */}
+            <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Icon name="MapPin" size={16} className="text-primary" />
+                <p className="font-semibold text-sm">Контакты сервиса</p>
+              </div>
+              <a href="tel:+79147571707" className="flex items-center gap-3 group">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon name="Phone" size={15} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Телефон</p>
+                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">+7 (914) 757-17-07</p>
+                </div>
+              </a>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                  <Icon name="Navigation" size={15} className="text-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Адрес</p>
+                  <p className="font-semibold text-sm">Южно-Сахалинск, Анивская ул., д.145</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Авто */}
+            <div>
+              <p className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <Icon name="Car" size={16} className="text-primary" />
+                Мои автомобили
+              </p>
+              {profileLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-24 rounded-2xl bg-card animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cars.map((car) => (
+                    <div
+                      key={car.id}
+                      onClick={() => setSelectedCarId(String(car.id))}
+                      className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                        String(car.id) === selectedCarId
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(car.id) === selectedCarId ? "bg-primary" : "bg-secondary"}`}>
+                            <Icon name="Car" size={18} className={String(car.id) === selectedCarId ? "text-black" : "text-foreground"} />
+                          </div>
+                          <div>
+                            <p className="font-semibold">{car.brand} {car.model}</p>
+                            <p className="text-xs text-muted-foreground">{car.year || "год не указан"}</p>
+                          </div>
+                        </div>
+                        {String(car.id) === selectedCarId && (
+                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                            <Icon name="Check" size={12} className="text-black" />
+                          </div>
+                        )}
+                      </div>
+                      {(car.last_oil_change || car.next_oil_change) && (
+                        <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Последняя замена</p>
+                            <p className="text-xs font-medium">{car.last_oil_change || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Следующая замена</p>
+                            <p className="text-xs font-medium text-primary">{car.next_oil_change || "—"}</p>
+                          </div>
                         </div>
                       )}
                     </div>
-                    {(car.last_oil_change || car.next_oil_change) && (
-                      <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Последняя замена</p>
-                          <p className="text-xs font-medium">{car.last_oil_change || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Следующая замена</p>
-                          <p className="text-xs font-medium text-primary">{car.next_oil_change || "—"}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))}
 
-                <button
-                  onClick={() => setCarDialogOpen(true)}
-                  className="w-full p-4 rounded-2xl border border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary flex items-center justify-center gap-2 transition-all"
-                >
-                  <Icon name="Plus" size={18} />
-                  <span className="text-sm font-medium">Добавить автомобиль</span>
-                </button>
-              </div>
-            )}
+                  <button
+                    onClick={() => setCarDialogOpen(true)}
+                    className="w-full p-4 rounded-2xl border border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Icon name="Plus" size={18} />
+                    <span className="text-sm font-medium">Добавить автомобиль</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -301,7 +444,7 @@ const Index = () => {
                       onClick={() => { setTab("home"); setCarDialogOpen(true); }}
                       className="w-full p-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
                     >
-                      Добавьте автомобиль в профиле
+                      Добавьте автомобиль в разделе «Профиль»
                     </button>
                   ) : (
                     <Select value={selectedCarId} onValueChange={setSelectedCarId}>
@@ -508,7 +651,7 @@ const Index = () => {
         <div className="max-w-md mx-auto flex">
           {(
             [
-              { key: "home", icon: "Car", label: "Авто" },
+              { key: "home", icon: "User", label: "Профиль" },
               { key: "booking", icon: "Calendar", label: "Запись" },
               { key: "history", icon: "ClipboardList", label: "История" },
               { key: "contacts", icon: "Phone", label: "Контакты" },
