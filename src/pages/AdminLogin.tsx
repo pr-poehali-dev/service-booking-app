@@ -83,10 +83,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
   const [smsText, setSmsText] = useState("");
   const [smsSending, setSmsSending] = useState(false);
   const [smsResult, setSmsResult] = useState<{ text: string; ok: boolean } | null>(null);
-  const [deletingUser, setDeletingUser] = useState<number | null>(null);
-  const [deletingBroadcast, setDeletingBroadcast] = useState<number | null>(null);
-  const [confirmDeleteUser, setConfirmDeleteUser] = useState<AdminUser | null>(null);
-  const [confirmDeleteBroadcast, setConfirmDeleteBroadcast] = useState<Broadcast | null>(null);
+
 
   const headers = { "Content-Type": "application/json", "X-Auth-Token": token };
 
@@ -155,41 +152,6 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
     }
   };
 
-  const deleteUser = async (userId: number) => {
-    setDeletingUser(userId);
-    try {
-      await fetch(`${func2url.admin}?action=delete_user&token=${token}`, {
-        method: "DELETE",
-        headers,
-        body: JSON.stringify({ user_id: userId }),
-      });
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      setSelectedUser(null);
-      setConfirmDeleteUser(null);
-      loadAll();
-    } catch {
-      // ignore
-    } finally {
-      setDeletingUser(null);
-    }
-  };
-
-  const deleteBroadcast = async (broadcastId: number) => {
-    setDeletingBroadcast(broadcastId);
-    try {
-      await fetch(`${func2url.admin}?action=delete_broadcast&token=${token}`, {
-        method: "DELETE",
-        headers,
-        body: JSON.stringify({ broadcast_id: broadcastId }),
-      });
-      setBroadcasts((prev) => prev.filter((b) => b.id !== broadcastId));
-      setConfirmDeleteBroadcast(null);
-    } catch {
-      // ignore
-    } finally {
-      setDeletingBroadcast(null);
-    }
-  };
 
   const STATUSES = [
     { value: "new", label: "Новая" },
@@ -339,12 +301,6 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground">{user.bookings_count} заявок</span>
-                      <button
-                        onClick={() => setConfirmDeleteUser(user)}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                      >
-                        <Icon name="Trash2" size={15} />
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -414,12 +370,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
                           <Icon name="RotateCcw" size={12} />
                           Повторить
                         </button>
-                        <button
-                          onClick={() => setConfirmDeleteBroadcast(b)}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                        >
-                          <Icon name="Trash2" size={14} />
-                        </button>
+
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -451,12 +402,6 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
                   </div>
                   {selectedUser.name || "Без имени"}
                 </div>
-                <button
-                  onClick={() => setConfirmDeleteUser(selectedUser)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                >
-                  <Icon name="Trash2" size={16} />
-                </button>
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 text-sm">
@@ -512,73 +457,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
         </Dialog>
       )}
 
-      {/* Подтверждение удаления клиента */}
-      {confirmDeleteUser && (
-        <Dialog open onOpenChange={() => setConfirmDeleteUser(null)}>
-          <DialogContent className="bg-card border-border max-w-xs mx-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <Icon name="Trash2" size={18} />
-                Удалить клиента?
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Клиент <span className="text-foreground font-medium">{confirmDeleteUser.name || confirmDeleteUser.phone}</span> будет удалён вместе со всеми заявками и автомобилями. Это действие необратимо.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmDeleteUser(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-secondary transition-all"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={() => deleteUser(confirmDeleteUser.id)}
-                  disabled={deletingUser === confirmDeleteUser.id}
-                  className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 disabled:opacity-50 transition-all"
-                >
-                  {deletingUser === confirmDeleteUser.id ? "Удаляем..." : "Удалить"}
-                </button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
 
-      {/* Подтверждение удаления рассылки */}
-      {confirmDeleteBroadcast && (
-        <Dialog open onOpenChange={() => setConfirmDeleteBroadcast(null)}>
-          <DialogContent className="bg-card border-border max-w-xs mx-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <Icon name="Trash2" size={18} />
-                Удалить из истории?
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground line-clamp-3">
-                «{confirmDeleteBroadcast.message}»
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmDeleteBroadcast(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-secondary transition-all"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={() => deleteBroadcast(confirmDeleteBroadcast.id)}
-                  disabled={deletingBroadcast === confirmDeleteBroadcast.id}
-                  className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 disabled:opacity-50 transition-all"
-                >
-                  {deletingBroadcast === confirmDeleteBroadcast.id ? "Удаляем..." : "Удалить"}
-                </button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };
