@@ -49,6 +49,13 @@ interface Stats {
   broadcasts: number;
 }
 
+interface Broadcast {
+  id: number;
+  message: string;
+  recipients_count: number;
+  sent_at: string | null;
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   new: { label: "Новая", color: "bg-primary/20 text-primary border-primary/30" },
   in_progress: { label: "В работе", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
@@ -72,9 +79,10 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<number | null>(null);
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [smsText, setSmsText] = useState("");
   const [smsSending, setSmsSending] = useState(false);
-  const [smsResult, setSmsResult] = useState<string>("");
+  const [smsResult, setSmsResult] = useState<{ text: string; ok: boolean } | null>(null);
 
   const headers = { "Content-Type": "application/json", "X-Auth-Token": token };
 
@@ -85,17 +93,20 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [usersRes, bookingsRes, statsRes] = await Promise.all([
+      const [usersRes, bookingsRes, statsRes, broadcastsRes] = await Promise.all([
         fetch(`${func2url.admin}?action=users&token=${token}`, { headers }),
         fetch(`${func2url.admin}?action=bookings&token=${token}`, { headers }),
         fetch(`${func2url.admin}?action=stats&token=${token}`, { headers }),
+        fetch(`${func2url.admin}?action=broadcasts&token=${token}`, { headers }),
       ]);
       const ud = await usersRes.json();
       const bd = await bookingsRes.json();
       const sd = await statsRes.json();
+      const brd = await broadcastsRes.json();
       setUsers(ud.users || []);
       setBookings(bd.bookings || []);
       setStats(sd);
+      setBroadcasts(brd.broadcasts || []);
     } catch {
       // ignore
     } finally {
@@ -130,11 +141,11 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
         body: JSON.stringify({ message: smsText }),
       });
       const data = await res.json();
-      setSmsResult(data.message || `Отправлено: ${data.sent_to}`);
+      setSmsResult({ text: data.message || `Отправлено: ${data.sent_to}`, ok: !!data.ok });
       setSmsText("");
       loadAll();
     } catch {
-      setSmsResult("Ошибка при отправке");
+      setSmsResult({ text: "Ошибка при отправке", ok: false });
     } finally {
       setSmsSending(false);
     }
@@ -304,20 +315,20 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
             <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
               <div className="flex items-center gap-2 mb-1">
                 <Icon name="MessageSquare" size={16} className="text-primary" />
-                <p className="font-semibold text-sm">Рассылка всем клиентам</p>
+                <p className="font-semibold text-sm">Новая рассылка</p>
               </div>
               <p className="text-xs text-muted-foreground">
-                Сообщение получат все зарегистрированные клиенты ({stats.users} чел.)
+                Сообщение получат все клиенты ({stats.users} чел.) через SMS
               </p>
               <textarea
                 value={smsText}
-                onChange={(e) => setSmsText(e.target.value)}
+                onChange={(e) => { setSmsText(e.target.value); setSmsResult(null); }}
                 placeholder="Введите текст сообщения..."
-                rows={5}
+                rows={4}
                 className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{smsText.length} символов</span>
+                <span className="text-xs text-muted-foreground">{smsText.length} симв.</span>
                 <button
                   onClick={sendSms}
                   disabled={smsSending || !smsText.trim()}
@@ -328,16 +339,50 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
                 </button>
               </div>
               {smsResult && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
-                  <Icon name="CheckCircle" size={16} className="text-green-400 shrink-0" />
-                  <p className="text-sm text-green-400">{smsResult}</p>
+                <div className={`flex items-center gap-2 p-3 rounded-xl border ${smsResult.ok ? "bg-green-500/10 border-green-500/20" : "bg-destructive/10 border-destructive/20"}`}>
+                  <Icon name={smsResult.ok ? "CheckCircle" : "AlertCircle"} size={16} className={smsResult.ok ? "text-green-400 shrink-0" : "text-destructive shrink-0"} />
+                  <p className={`text-sm ${smsResult.ok ? "text-green-400" : "text-destructive"}`}>{smsResult.text}</p>
                 </div>
               )}
             </div>
-            <div className="p-4 rounded-2xl bg-card border border-border">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Рассылки сохраняются в истории. Всего отправлено рассылок: <span className="text-foreground font-medium">{stats.broadcasts}</span>
-              </p>
+
+            {/* История рассылок */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <Icon name="History" size={14} className="text-muted-foreground" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">История рассылок</p>
+                <span className="ml-auto text-xs text-muted-foreground">{broadcasts.length} шт.</span>
+              </div>
+              {loading ? (
+                [1, 2].map((i) => <div key={i} className="h-16 rounded-2xl bg-card animate-pulse" />)
+              ) : broadcasts.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-sm">Рассылок пока не было</div>
+              ) : (
+                broadcasts.map((b) => (
+                  <div key={b.id} className="p-3.5 rounded-2xl bg-card border border-border space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm text-foreground leading-snug flex-1 break-words">{b.message}</p>
+                      <button
+                        onClick={() => { setSmsText(b.message); setSmsResult(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition-all"
+                      >
+                        <Icon name="RotateCcw" size={12} />
+                        Повторить
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Icon name="Users" size={11} />
+                        {b.recipients_count} получ.
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Icon name="Clock" size={11} />
+                        {fmt(b.sent_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

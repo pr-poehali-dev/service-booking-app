@@ -216,6 +216,26 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"ok": sms_result.get("ok", False), "sent_to": count, "message": msg, "sms_error": sms_result.get("error")}),
         }
 
+    # GET ?action=broadcasts — история рассылок
+    if method == "GET" and action == "broadcasts":
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT id, message, recipients_count, sent_at FROM {SCHEMA}.sms_broadcasts ORDER BY sent_at DESC LIMIT 50"
+        )
+        broadcasts = [
+            {
+                "id": r[0],
+                "message": r[1],
+                "recipients_count": r[2] or 0,
+                "sent_at": r[3].isoformat() if r[3] else None,
+            }
+            for r in cur.fetchall()
+        ]
+        cur.close()
+        conn.close()
+        return {"statusCode": 200, "headers": cors, "body": json.dumps({"broadcasts": broadcasts})}
+
     # GET ?action=stats — статистика
     if method == "GET" and action == "stats":
         conn = get_conn()
