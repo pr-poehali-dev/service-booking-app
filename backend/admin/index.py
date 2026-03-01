@@ -254,4 +254,33 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"users": users_count, "bookings": bookings_count, "broadcasts": broadcasts_count}),
         }
 
+    # DELETE ?action=delete_user — удалить клиента (и все его данные)
+    if method == "DELETE" and action == "delete_user":
+        user_id = body.get("user_id")
+        if not user_id:
+            return {"statusCode": 400, "headers": cors, "body": json.dumps({"error": "Укажите user_id"})}
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM {SCHEMA}.bookings WHERE user_id=%s", (user_id,))
+        cur.execute(f"DELETE FROM {SCHEMA}.cars WHERE user_id=%s", (user_id,))
+        cur.execute(f"DELETE FROM {SCHEMA}.otp_codes WHERE phone=(SELECT phone FROM {SCHEMA}.users WHERE id=%s)", (user_id,))
+        cur.execute(f"DELETE FROM {SCHEMA}.users WHERE id=%s", (user_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"statusCode": 200, "headers": cors, "body": json.dumps({"ok": True})}
+
+    # DELETE ?action=delete_broadcast — удалить запись рассылки из истории
+    if method == "DELETE" and action == "delete_broadcast":
+        broadcast_id = body.get("broadcast_id")
+        if not broadcast_id:
+            return {"statusCode": 400, "headers": cors, "body": json.dumps({"error": "Укажите broadcast_id"})}
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM {SCHEMA}.sms_broadcasts WHERE id=%s", (broadcast_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"statusCode": 200, "headers": cors, "body": json.dumps({"ok": True})}
+
     return {"statusCode": 404, "headers": cors, "body": json.dumps({"error": "Not found"})}
