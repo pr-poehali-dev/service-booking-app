@@ -57,7 +57,7 @@ interface Broadcast {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  new: { label: "Новая", color: "bg-primary/20 text-primary border-primary/30" },
+  new: { label: "Новая", color: "bg-[#c8920a]/20 text-[#c8920a] border-[#c8920a]/30" },
   in_progress: { label: "В работе", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
   done: { label: "Выполнена", color: "bg-green-500/20 text-green-400 border-green-500/30" },
 };
@@ -163,7 +163,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-[linear-gradient(135deg,#7a5c00_0%,#c8920a_20%,#ffd700_45%,#f0c040_55%,#c8920a_80%,#7a5c00_100%)] flex items-center justify-center">
             <Icon name="Shield" size={16} className="text-black" />
           </div>
           <div>
@@ -189,7 +189,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
             { label: "Рассылок", value: stats.broadcasts, icon: "MessageSquare" },
           ].map((s) => (
             <div key={s.label} className="p-3 rounded-2xl bg-card border border-border text-center">
-              <Icon name={s.icon} size={16} className="text-primary mx-auto mb-1" />
+              <Icon name={s.icon} size={16} className="text-[#c8920a] mx-auto mb-1" />
               <p className="text-xl font-bold">{s.value}</p>
               <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
@@ -207,7 +207,7 @@ const AdminPanel = ({ token, onLogout }: { token: string; onLogout: () => void }
               key={id}
               onClick={() => setTab(id)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                tab === id ? "bg-primary text-black" : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                tab === id ? "bg-[linear-gradient(135deg,#7a5c00_0%,#c8920a_20%,#ffd700_45%,#f0c040_55%,#c8920a_80%,#7a5c00_100%)] text-black" : "bg-card border border-border text-muted-foreground hover:text-foreground"
               }`}
             >
               <Icon name={icon} size={14} />

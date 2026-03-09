@@ -91,7 +91,7 @@ const Login = () => {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 pb-24">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[linear-gradient(135deg,#7a5c00_0%,#c8920a_20%,#ffd700_45%,#f0c040_55%,#c8920a_80%,#7a5c00_100%)] mb-4">
             <Icon name="Wrench" size={32} className="text-black" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">АвтоСервис</h1>
@@ -119,7 +119,7 @@ const Login = () => {
             <Button
               onClick={sendOtp}
               disabled={loading}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl text-base"
+              className="w-full h-12 bg-[linear-gradient(135deg,#7a5c00_0%,#c8920a_20%,#ffd700_45%,#f0c040_55%,#c8920a_80%,#7a5c00_100%)] hover:opacity-90 text-black font-semibold rounded-xl text-base"
             >
               {loading ? "Отправляем..." : "Получить код"}
             </Button>
@@ -156,14 +156,14 @@ const Login = () => {
             <Button
               onClick={verifyOtp}
               disabled={loading || otp.length < 4}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-black font-semibold rounded-xl text-base"
+              className="w-full h-12 bg-[linear-gradient(135deg,#7a5c00_0%,#c8920a_20%,#ffd700_45%,#f0c040_55%,#c8920a_80%,#7a5c00_100%)] hover:opacity-90 text-black font-semibold rounded-xl text-base"
             >
               {loading ? "Проверяем..." : "Войти"}
             </Button>
             <button
               onClick={sendOtp}
               disabled={loading}
-              className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+              className="w-full text-sm text-muted-foreground hover:text-[#c8920a] transition-colors"
             >
               Отправить код повторно
             </button>
@@ -175,8 +175,8 @@ const Login = () => {
       <div className="w-full max-w-sm mt-10">
         <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Icon name="Smartphone" size={16} className="text-primary" />
+            <div className="w-8 h-8 rounded-xl bg-[#c8920a]/10 flex items-center justify-center shrink-0">
+              <Icon name="Smartphone" size={16} className="text-[#c8920a]" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Добавить на экран iPhone</p>
@@ -190,8 +190,8 @@ const Login = () => {
               { step: "3", icon: "Check", text: '«Добавить» — готово! Ярлык «ОЙЛ СЕРВИС» на рабочем столе' },
             ].map(({ step, icon, text }) => (
               <div key={step} className="flex items-start gap-3">
-                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-primary text-[10px] font-bold">{step}</span>
+                <div className="w-5 h-5 rounded-full bg-[#c8920a]/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[#c8920a] text-[10px] font-bold">{step}</span>
                 </div>
                 <div className="flex items-start gap-2 flex-1">
                   <Icon name={icon} size={14} className="text-muted-foreground shrink-0 mt-0.5" />

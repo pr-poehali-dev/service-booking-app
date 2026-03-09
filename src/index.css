@@ -102,4 +102,29 @@
     background: hsl(0 0% 9%);
     border: 1px solid hsl(0 0% 16%);
   }
+  .gold-bg {
+    background: linear-gradient(
+      135deg,
+      #7a5c00 0%,
+      #c8920a 20%,
+      #ffd700 45%,
+      #f0c040 55%,
+      #c8920a 80%,
+      #7a5c00 100%
+    ) !important;
+  }
+  .gold-text {
+    background: linear-gradient(
+      135deg,
+      #7a5c00 0%,
+      #c8920a 20%,
+      #ffd700 45%,
+      #f0c040 55%,
+      #c8920a 80%,
+      #7a5c00 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 }
