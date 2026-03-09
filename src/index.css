@@ -12,30 +12,37 @@
     --card-foreground: 0 0% 96%;
     --popover: 0 0% 9%;
     --popover-foreground: 0 0% 96%;
-    --primary: 43 74% 42%;
+    --primary: 43 80% 45%;
     --primary-foreground: 0 0% 0%;
     --secondary: 0 0% 14%;
     --secondary-foreground: 0 0% 96%;
     --muted: 0 0% 14%;
     --muted-foreground: 0 0% 55%;
-    --accent: 43 74% 42%;
+    --accent: 43 80% 45%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 16%;
     --input: 0 0% 14%;
-    --ring: 43 74% 42%;
+    --ring: 43 80% 45%;
     --radius: 0.75rem;
     --sidebar-background: 0 0% 7%;
     --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 43 74% 42%;
+    --sidebar-primary: 43 80% 45%;
     --sidebar-primary-foreground: 0 0% 0%;
     --sidebar-accent: 0 0% 14%;
     --sidebar-accent-foreground: 0 0% 96%;
     --sidebar-border: 0 0% 16%;
-    --sidebar-ring: 43 74% 42%;
-    --gold-from: #b8860b;
-    --gold-to: #d4a017;
+    --sidebar-ring: 43 80% 45%;
+    --gold-gradient: linear-gradient(
+      135deg,
+      #7a5c00 0%,
+      #c8920a 20%,
+      #ffd700 45%,
+      #f0c040 55%,
+      #c8920a 80%,
+      #7a5c00 100%
+    );
   }
 }
 
@@ -64,13 +71,32 @@
 
 @layer utilities {
   .text-gradient {
-    background: linear-gradient(135deg, #b8860b, #f5c842, #d4a017);
+    background: linear-gradient(
+      135deg,
+      #7a5c00 0%,
+      #c8920a 20%,
+      #ffd700 45%,
+      #f0c040 55%,
+      #c8920a 80%,
+      #7a5c00 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .bg-orange-glow {
-    box-shadow: 0 0 30px rgba(184, 134, 11, 0.2);
+    box-shadow: 0 0 30px rgba(200, 146, 10, 0.25);
+  }
+  .bg-gold-gradient {
+    background: linear-gradient(
+      135deg,
+      #7a5c00 0%,
+      #c8920a 20%,
+      #ffd700 45%,
+      #f0c040 55%,
+      #c8920a 80%,
+      #7a5c00 100%
+    );
   }
   .card-dark {
     background: hsl(0 0% 9%);
